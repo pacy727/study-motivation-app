@@ -1,16 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+interface Log {
+  id: string;
+  content: string;
+  userId: string;
+  createdAt?: Timestamp;
+}
+
 export default function StudyLogList() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<Log[]>([]);
 
   const fetchLogs = async () => {
     const q = query(collection(db, "studyLogs"), orderBy("createdAt", "desc"));
     const snapshot = await getDocs(q);
-    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const data: Log[] = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      content: doc.data().content,
+      userId: doc.data().userId,
+      createdAt: doc.data().createdAt,
+    }));
     setLogs(data);
   };
 
