@@ -6,12 +6,12 @@ import { auth } from "@/lib/firebase";
 import Link from "next/link";
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null); // ← 修正箇所
+  const [user, setUser] = useState<User | null>(null); // ← ここが明確な型指定
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user); // ← 修正箇所（as anyを削除）
+      setUser(user); // as any を完全に削除済み
       setLoading(false);
     });
 
