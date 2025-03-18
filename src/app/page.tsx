@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import Link from "next/link";
 
 export default function Home() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null); // ← 修正箇所
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user as any);
+      setUser(user); // ← 修正箇所（as anyを削除）
       setLoading(false);
     });
 
