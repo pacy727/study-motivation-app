@@ -1,114 +1,138 @@
 "use client";
 
-// Reactの機能やFirebaseの機能を読み込む
 import { useEffect, useState } from "react";
 import {
-  onAuthStateChanged, // ログイン状態を見張る関数
-  signInWithPopup,    // Googleでログインするための関数
-  GoogleAuthProvider, // Google認証の設定
-  User                // ユーザー情報の型
+  GoogleAuthProvider,
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithRedirect,
+  signOut,
+  User,
 } from "firebase/auth";
-
 import {
-  collection, query, orderBy, getDocs, Timestamp
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  Timestamp,
 } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
 
-import { auth, db } from "@/lib/firebase"; // Firebaseの設定を読み込む
-
-// 学習記録のデータの形をあらかじめ決めておく
 interface Log {
   id: string;
   content: string;
   userId: string;
+  time: number;
   createdAt?: Timestamp;
 }
 
-// このページが実際に表示される関数
-export default function Home() {
-  // ユーザー情報を入れる場所（まだログインしていなければnull）
+export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
-
-  // 学習記録を入れるためのリスト（最初は空っぽ）
   const [logs, setLogs] = useState<Log[]>([]);
-
-  // ページ読み込み中かどうかを管理する（最初はtrue＝読み込み中）
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  // 最初にログインしているか確認する
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);      // ユーザーがいたら保存
-      setLoading(false);  // 読み込み終了
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) setUser(result.user);
     });
-
-    return () => unsubscribe(); // 後片付け（リスナーの解除）
   }, []);
 
-  // Googleでログインする関数（ボタンを押したときに使う）
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider(); // Googleログインの準備
-    try {
-      const result = await signInWithPopup(auth, provider); // ポップアップでログイン実行
-      setUser(result.user); // ログイン成功したらユーザーを保存
-    } catch (error) {
-      console.error("ログイン失敗", error); // エラーがあれば表示
-    }
-  };
-
-  // Firestoreから学習記録を読み込む関数
-  const fetchLogs = async () => {
-    const q = query(
-      collection(db, "studyLogs"),         // "studyLogs"という場所から
-      orderBy("createdAt", "desc")         // 新しい順に並べて
-    );
-    const snapshot = await getDocs(q);     // データを取り出す
-    const data: Log[] = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      content: doc.data().content,
-      userId: doc.data().userId,
-      createdAt: doc.data().createdAt,
-    }));
-    setLogs(data); // 画面に表示できるように保存
-  };
-
-  // ユーザーがログインしたあとに学習記録を読み込む
   useEffect(() => {
-    if (user) {
-      fetchLogs();
-    }
-  }, [user]); // 「user」が変わったときだけ動く
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // 読み込み中は「読み込み中...」を表示
-  if (loading) {
-    return <div className="text-center mt-10">読み込み中...</div>;
-  }
+  useEffect(() => {
+    const fetchLogs = async () => {
+      const q = query(collection(db, "studyLogs"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      const data: Log[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Log[];
+      setLogs(data);
+    };
+    if (user) fetchLogs();
+  }, [user]);
 
-  // ログインしていなければ、ログインを促す画面を表示
-  if (!user) {
+  const handleLogin = () => {
+    const provider = new GoogleAuthProvider();
+    signInWithRedirect(auth, provider);
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setUser(null);
+    router.push("/");
+  };
+
+  const totalMyTime = logs
+    .filter((log) => log.userId === user?.uid)
+    .reduce((sum, log) => sum + (log.time || 0), 0);
+
+  const ranking = logs.reduce((acc: Record<string, number>, log) => {
+    acc[log.userId] = (acc[log.userId] || 0) + (log.time || 0);
+    return acc;
+  }, {});
+
+  const sortedRanking = Object.entries(ranking)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  if (loading) return <div>読み込み中...</div>;
+
+  if (!user)
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-4">
-        <h1 className="text-2xl font-bold mb-4">ログインが必要です</h1>
-        <button
-          onClick={handleLogin}
-          className="px-4 py-2 bg-blue-500 text-white rounded"
-        >
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <h1 className="text-2xl mb-4">ログインしてください</h1>
+        <button onClick={handleLogin} className="bg-blue-500 text-white px-4 py-2 rounded">
           Googleでログイン
         </button>
-      </main>
+      </div>
     );
-  }
 
-  // ログイン済みの人には学習記録一覧を表示
   return (
-    <main className="flex min-h-screen flex-col items-center justify-start p-4">
-      <h1 className="text-2xl font-bold mb-4">学習記録一覧</h1>
-      <ul className="w-full">
-        {logs.map((log) => (
-          <li key={log.id} className="border-b border-gray-300 py-2">
-            {log.content}
-          </li>
-        ))}
-      </ul>
+    <main className="p-4">
+      <header className="flex justify-end items-center gap-4 mb-6">
+        <span>{user.displayName}</span>
+        <button onClick={() => router.push("/study-log")} className="bg-green-500 text-white px-3 py-1 rounded">
+          記録
+        </button>
+        <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-1 rounded">
+          ログアウト
+        </button>
+      </header>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-bold mb-2">学習時間ランキング</h2>
+        <ol className="list-decimal pl-5">
+          {sortedRanking.map(([uid, time], index) => (
+            <li key={index}>{uid}：{time}分</li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-bold">あなたの学習時間：{totalMyTime}分</h2>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold mb-2">あなたの学習記録</h2>
+        <ul className="list-disc pl-5">
+          {logs
+            .filter((log) => log.userId === user.uid)
+            .map((log) => (
+              <li key={log.id}>
+                {log.content}（{log.time}分）
+              </li>
+            ))}
+        </ul>
+      </section>
     </main>
   );
 }
