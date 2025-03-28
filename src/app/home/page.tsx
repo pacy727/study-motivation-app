@@ -23,12 +23,9 @@ export default function HomePage() {
   // ログインチェック
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        router.push("/");
-      } else {
-        setUser(u);
-        setLoading(false);
-      }
+      setUser(u);
+      setLoading(false);
+      if (!u) router.push("/");
     });
     return () => unsubscribe();
   }, [router]);
@@ -49,7 +46,6 @@ export default function HomePage() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    setUser(null);
     router.push("/");
   };
 
@@ -64,10 +60,12 @@ export default function HomePage() {
 
   if (loading) return <div>読み込み中...</div>;
 
+  if (!user) return null; // ログイン未検出時の安全対策
+
   return (
     <main className="p-4">
       <header className="flex justify-end items-center gap-4 mb-6">
-        <span>{user?.displayName}</span>
+        <span>{user.displayName}</span>
         <button onClick={() => router.push("/study-log")} className="bg-green-500 text-white px-3 py-1 rounded">
           記録
         </button>
@@ -92,7 +90,7 @@ export default function HomePage() {
       <section>
         <h2 className="text-xl font-bold mb-2">あなたの学習記録</h2>
         <ul className="list-disc pl-5">
-          {logs.filter((log) => log.userId === user?.uid).map((log) => (
+          {logs.filter((log) => log.userId === user.uid).map((log) => (
             <li key={log.id}>
               {log.content}（{log.time}分）
             </li>
