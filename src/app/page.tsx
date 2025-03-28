@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
   signInWithRedirect,
   getRedirectResult,
   onAuthStateChanged,
+  User,
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  // 🔹 ユーザー状態監視（これが最重要！）
   useEffect(() => {
-    // リダイレクトログイン直後の結果を取得
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) {
-        router.push("/home");
-      }
-    });
-
-    // ログイン済みであれば自動で /home に遷移
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.push("/home");
-      }
+      setUser(user);
+      setLoading(false);
     });
-
     return () => unsubscribe();
-  }, [router]);
+  }, []);
+
+  // 🔹 認証済みなら /home に遷移
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/home");
+    }
+  }, [loading, user, router]);
+
+  // 🔹 リダイレクト結果の取得（ここではsetUserしない）
+  useEffect(() => {
+    getRedirectResult(auth).catch((error) => {
+      console.error("リダイレクト後のログイン失敗:", error);
+    });
+  }, []);
 
   const handleLogin = () => {
     const provider = new GoogleAuthProvider();
