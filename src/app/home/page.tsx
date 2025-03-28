@@ -21,14 +21,22 @@ export default function HomePage() {
   const router = useRouter();
 
   // ログインチェック
+// 🔹 onAuthStateChanged でログイン状態を取得
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
-      if (!u) router.push("/");
     });
     return () => unsubscribe();
-  }, [router]);
+  }, []);
+  
+  // 🔹 未ログイン時にトップへ戻す（loading 終了後に判定）
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/");
+    }
+  }, [loading, user, router]);
+  
 
   // 学習記録の取得
   useEffect(() => {
