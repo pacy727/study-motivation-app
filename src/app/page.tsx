@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged,
+} from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 
@@ -9,11 +14,21 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // リダイレクトログイン直後の結果を取得
     getRedirectResult(auth).then((result) => {
       if (result?.user) {
         router.push("/home");
       }
     });
+
+    // ログイン済みであれば自動で /home に遷移
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.push("/home");
+      }
+    });
+
+    return () => unsubscribe();
   }, [router]);
 
   const handleLogin = () => {
