@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
-  signInWithRedirect,
+  signInWithPopup,
   onAuthStateChanged,
   signOut,
   User,
@@ -15,14 +15,15 @@ import {
   query,
   Timestamp,
 } from "firebase/firestore";
-
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase"; // ←ご自身のFirebase初期化ファイルをimport
+import { auth, db } from "@/lib/firebase";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Log {
   id: string;
   content: string;
   userId: string;
+  userName?: string;
   time: number;
   createdAt?: Timestamp;
 }
@@ -33,28 +34,24 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // ★ onAuthStateChanged でログイン状態を監視
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("onAuthStateChanged:", currentUser);
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // ★ ログイン済ユーザーなら学習ログを取得
   useEffect(() => {
     const fetchLogs = async () => {
       const q = query(collection(db, "studyLogs"), orderBy("createdAt", "desc"));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
+      const data: Log[] = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Log[];
       setLogs(data);
     };
-
     if (user) {
       fetchLogs();
     } else {
@@ -62,38 +59,55 @@ export default function HomePage() {
     }
   }, [user]);
 
-  // Googleでログイン（リダイレクト方式）
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
-    signInWithRedirect(auth, provider);
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("ログイン失敗:", error);
+    }
   };
 
-  // ログアウト
   const handleLogout = async () => {
     await signOut(auth);
     setUser(null);
   };
 
-  // 自分の合計学習時間
-  const totalMyTime = logs
-    .filter((log) => log.userId === user?.uid)
-    .reduce((sum, log) => sum + (log.time || 0), 0);
+  const userLogs = logs.filter((log) => log.userId === user?.uid);
+  const totalMyTime = userLogs.reduce((sum, log) => sum + (log.time || 0), 0);
 
-  // ユーザーごとのランキング
-  const rankingObj = logs.reduce((acc: Record<string, number>, log) => {
-    acc[log.userId] = (acc[log.userId] || 0) + (log.time || 0);
-    return acc;
-  }, {});
-  const sortedRanking = Object.entries(rankingObj)
-    .sort((a, b) => b[1] - a[1])
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 6);
+  const weeklyLogs = userLogs.filter((log) => log.createdAt?.toDate() && log.createdAt.toDate() >= oneWeekAgo);
+  const weeklyTotal = weeklyLogs.reduce((sum, log) => sum + (log.time || 0), 0);
+
+  const barData = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(oneWeekAgo);
+    date.setDate(date.getDate() + i);
+    const dayString = `${date.getMonth() + 1}/${date.getDate()}`;
+    const total = weeklyLogs
+      .filter((log) => log.createdAt?.toDate() && log.createdAt.toDate().toDateString() === date.toDateString())
+      .reduce((sum, log) => sum + (log.time || 0), 0);
+    return { day: dayString, time: total };
+  });
+
+  const rankingMap = new Map<string, { name: string; time: number }>();
+  logs.forEach((log) => {
+    const current = rankingMap.get(log.userId);
+    const name = log.userId === user?.uid ? user.displayName || log.userId : log.userName || log.userId;
+    if (current) {
+      current.time += log.time || 0;
+    } else {
+      rankingMap.set(log.userId, { name, time: log.time || 0 });
+    }
+  });
+
+  const sortedRanking = Array.from(rankingMap.entries())
+    .sort((a, b) => b[1].time - a[1].time)
     .slice(0, 10);
 
-  // ローディング中の表示
-  if (loading) {
-    return <div>読み込み中...</div>;
-  }
+  if (loading) return <div>読み込み中...</div>;
 
-  // ログインしていないときの表示
   if (!user) {
     return (
       <main className="flex flex-col items-center justify-center min-h-screen">
@@ -105,16 +119,12 @@ export default function HomePage() {
     );
   }
 
-  // ログイン済ユーザー向けのページ表示
   return (
     <main className="p-4">
       <header className="flex justify-end items-center gap-4 mb-6">
-        <span>{user.displayName} さん</span>
-        <button
-          onClick={() => router.push("/study-log")}
-          className="bg-green-500 text-white px-3 py-1 rounded"
-        >
-          記録する
+        <span>{user.displayName}</span>
+        <button onClick={() => router.push("/study-log")} className="bg-green-500 text-white px-3 py-1 rounded">
+          記録
         </button>
         <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-1 rounded">
           ログアウト
@@ -124,30 +134,34 @@ export default function HomePage() {
       <section className="mb-8">
         <h2 className="text-xl font-bold mb-2">学習時間ランキング</h2>
         <ol className="list-decimal pl-5">
-          {sortedRanking.map(([uid, time], index) => (
-            <li key={index}>
-              {uid}：{time}分
-            </li>
+          {sortedRanking.map(([, info], index) => (
+            <li key={index}>{info.name}：{info.time}分</li>
           ))}
         </ol>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-bold">
-          あなたの学習時間：{totalMyTime}分
-        </h2>
+        <h2 className="text-xl font-bold">あなたの学習時間</h2>
+        <p>累計：{totalMyTime}分</p>
+        <p>今週：{weeklyTotal}分</p>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+              <XAxis dataKey="day" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="time" fill="#3b82f6" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </section>
 
       <section>
         <h2 className="text-xl font-bold mb-2">あなたの学習記録</h2>
         <ul className="list-disc pl-5">
-          {logs
-            .filter((log) => log.userId === user.uid)
-            .map((log) => (
-              <li key={log.id}>
-                {log.content}（{log.time}分）
-              </li>
-            ))}
+          {userLogs.map((log) => (
+            <li key={log.id}>{log.content}（{log.time}分）</li>
+          ))}
         </ul>
       </section>
     </main>
