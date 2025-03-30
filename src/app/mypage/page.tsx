@@ -14,7 +14,7 @@ import {
   doc
 } from "firebase/firestore";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
-import { Calendar } from "react-calendar";
+import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { motion } from "framer-motion";
 
@@ -131,51 +131,6 @@ export default function MyPage() {
       <h1 className="text-4xl font-bold text-center mb-8">マイページ</h1>
 
       <section className="mb-6">
-        <h2 className="text-2xl font-bold mb-4">学習統計</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded shadow">
-            <p className="font-semibold">累計勉強時間</p>
-            <p>{logs.reduce((sum, log) => sum + log.time, 0)}分</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <p className="font-semibold">週計勉強時間</p>
-            <p>{logs.reduce((sum, log) => sum + log.time, 0)}分</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <p className="font-semibold">本日の勉強時間</p>
-            <p>{logs.filter(log => log.createdAt?.toDate().toDateString() === new Date().toDateString()).reduce((sum, log) => sum + log.time, 0)}分</p>
-          </div>
-          <div className="bg-white p-4 rounded shadow">
-            <p className="font-semibold">順位</p>
-            <p>3位</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="text-2xl font-bold mb-4">科目別勉強時間</h2>
-        <div className="bg-white p-4 rounded shadow grid grid-cols-6 text-center">
-          <p>国</p><p>数</p><p>英</p><p>理</p><p>社</p><p>情</p>
-          <p>100分</p><p>200分</p><p>150分</p><p>180分</p><p>130分</p><p>70分</p>
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="text-2xl font-bold mb-4">週間目標設定</h2>
-        {!editingGoal ? (
-          <div className="flex items-center gap-4">
-            <p className="text-xl">現在の目標: {weeklyGoal}時間</p>
-            <button onClick={() => setEditingGoal(true)} className="bg-blue-500 text-white px-4 py-2 rounded">設定</button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4">
-            <input type="number" value={weeklyGoal} onChange={(e) => setWeeklyGoal(Number(e.target.value))} className="border p-2 rounded" />
-            <button onClick={() => setEditingGoal(false)} className="bg-blue-500 text-white px-4 py-2 rounded">保存</button>
-          </div>
-        )}
-      </section>
-
-      <section className="mb-6">
         <h2 className="text-2xl font-bold mb-4">勉強時間カレンダー</h2>
         <div className="bg-white p-4 rounded shadow text-center max-w-xl mx-auto">
           <Calendar
@@ -184,13 +139,16 @@ export default function MyPage() {
               const minutes = calendarData[dateStr] || 0;
               return (
                 <div className="text-center">
-                  <div className="text-base font-semibold text-blue-600 whitespace-nowrap">{minutes > 0 ? `${minutes}分` : ""}</div>
+                  <div className="text-base font-semibold text-blue-600 whitespace-nowrap">
+                    {minutes > 0 ? `${minutes}分` : ""}
+                  </div>
                 </div>
               );
             }}
           />
         </div>
       </section>
+   
 
       <section className="mb-6">
         <h2 className="text-2xl font-bold mb-4">StudyToDoリスト</h2>
