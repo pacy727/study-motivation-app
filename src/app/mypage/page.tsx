@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
 import {
   collection,
@@ -12,7 +13,7 @@ import {
   updateDoc,
   doc
 } from "firebase/firestore";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { Calendar } from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { motion } from "framer-motion";
@@ -35,11 +36,13 @@ export default function MyPage() {
   const [user, setUser] = useState<User | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [weeklyGoal, setWeeklyGoal] = useState<number>(10); // 時間単位に変更
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(10);
   const [editingGoal, setEditingGoal] = useState(false);
   const [newSubject, setNewSubject] = useState("");
   const [newTopic, setNewTopic] = useState("");
   const [calendarData, setCalendarData] = useState<Record<string, number>>({});
+
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -101,12 +104,30 @@ export default function MyPage() {
     );
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/");
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="max-w-6xl mx-auto py-10 px-4 bg-gradient-to-br from-blue-50 to-yellow-50 rounded-xl"
+      className="max-w-6xl mx-auto py-10 px-4 bg-gradient-to-br from-lime-100 via-teal-100 to-blue-200 rounded-xl"
     >
+      <header className="flex justify-end items-center gap-4 mb-6">
+        <span>{user?.displayName}</span>
+        <button onClick={() => router.push("/")} className="bg-blue-500 text-white px-3 py-1 rounded">
+          ホーム
+        </button>
+        <button onClick={() => router.push("/study-log")} className="bg-green-500 text-white px-3 py-1 rounded">
+          記録
+        </button>
+        <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-1 rounded">
+          ログアウト
+        </button>
+      </header>
+
       <h1 className="text-4xl font-bold text-center mb-8">マイページ</h1>
 
       <section className="mb-6">
