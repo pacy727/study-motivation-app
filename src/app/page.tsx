@@ -18,6 +18,7 @@ import {
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { motion } from "framer-motion";
 
 interface Log {
   id: string;
@@ -33,6 +34,8 @@ export default function HomePage() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const weeklyGoal = 600;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -52,11 +55,8 @@ export default function HomePage() {
       })) as Log[];
       setLogs(data);
     };
-    if (user) {
-      fetchLogs();
-    } else {
-      setLogs([]);
-    }
+    if (user) fetchLogs();
+    else setLogs([]);
   }, [user]);
 
   const handleLogin = async () => {
@@ -78,92 +78,109 @@ export default function HomePage() {
 
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 6);
-  const weeklyLogs = userLogs.filter((log) => log.createdAt?.toDate() && log.createdAt.toDate() >= oneWeekAgo);
+  const weeklyLogs = userLogs.filter(
+    (log) => log.createdAt?.toDate() && log.createdAt.toDate() >= oneWeekAgo
+  );
   const weeklyTotal = weeklyLogs.reduce((sum, log) => sum + (log.time || 0), 0);
+  const weeklyAchievement = ((weeklyTotal / weeklyGoal) * 100).toFixed(1);
 
   const barData = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(oneWeekAgo);
     date.setDate(date.getDate() + i);
     const dayString = `${date.getMonth() + 1}/${date.getDate()}`;
     const total = weeklyLogs
-      .filter((log) => log.createdAt?.toDate() && log.createdAt.toDate().toDateString() === date.toDateString())
+      .filter((log) => log.createdAt?.toDate()?.toDateString() === date.toDateString())
       .reduce((sum, log) => sum + (log.time || 0), 0);
     return { day: dayString, time: total };
   });
 
-  const rankingMap = new Map<string, { name: string; time: number }>();
-  logs.forEach((log) => {
-    const current = rankingMap.get(log.userId);
-    const name = log.userId === user?.uid ? user.displayName || log.userId : log.userName || log.userId;
-    if (current) {
-      current.time += log.time || 0;
-    } else {
-      rankingMap.set(log.userId, { name, time: log.time || 0 });
-    }
-  });
-
-  const sortedRanking = Array.from(rankingMap.entries())
+  const sortedRanking = Array.from(
+    logs.reduce((map, log) => {
+      const userEntry = map.get(log.userId) || { name: log.userName || log.userId, time: 0 };
+      userEntry.time += log.time;
+      map.set(log.userId, userEntry);
+      return map;
+    }, new Map())
+  )
     .sort((a, b) => b[1].time - a[1].time)
     .slice(0, 10);
 
-  if (loading) return <div>読み込み中...</div>;
+  const streakDays = Array.from({ length: 30 }).reduce((streak: number, _, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const hasLog = userLogs.some(
+      (log) => log.createdAt?.toDate()?.toDateString() === date.toDateString()
+    );
+    return hasLog ? streak + 1 : streak > 0 ? streak : 0;
+  }, 0);
 
-  if (!user) {
+  if (loading) return <div className="text-center p-6 text-gray-500">読み込み中...</div>;
+
+  if (!user)
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen">
-        <h1 className="text-2xl font-bold mb-4">自発的学習促進システム</h1>
-        <button onClick={handleLogin} className="bg-blue-500 text-white px-4 py-2 rounded">
+      <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-cyan-400 to-yellow-300 text-white">
+        <h1 className="text-4xl font-extrabold mb-6">Ohtani Study Diary</h1>
+        <button onClick={handleLogin} className="px-6 py-2 bg-white text-blue-500 font-semibold rounded shadow-lg hover:bg-gray-100 transition">
           Googleでログイン
         </button>
       </main>
     );
-  }
 
   return (
-    <main className="p-4">
-      <header className="flex justify-end items-center gap-4 mb-6">
-        <span>{user.displayName}</span>
-        <button onClick={() => router.push("/study-log")} className="bg-green-500 text-white px-3 py-1 rounded">
-          記録
-        </button>
-        <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-1 rounded">
-          ログアウト
-        </button>
+    <motion.main
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="max-w-3xl mx-auto p-8 bg-gradient-to-r from-cyan-200 to-yellow-200 text-gray-900 rounded-xl shadow-xl"
+    >
+      <header className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold">ようこそ、{user.displayName}さん！</h2>
+        <div>
+          <button onClick={() => router.push("/study-log")} className="mr-4 px-4 py-2 bg-green-400 rounded hover:bg-green-500 transition">
+            記録
+          </button>
+          <button onClick={() => router.push("/mypage")} className="mr-4 px-4 py-2 bg-blue-400 rounded hover:bg-blue-500 transition">
+            マイページ
+          </button>
+          <button onClick={handleLogout} className="px-4 py-2 bg-red-400 rounded hover:bg-red-500 transition">
+            ログアウト
+          </button>
+        </div>
       </header>
 
+      <section className="mb-6 text-center">
+        <p className="text-2xl font-semibold">今週の達成率：{weeklyAchievement}% (目標10時間)</p>
+        <p className="text-xl font-semibold mt-2">🔥 連続学習日数：{streakDays}日</p>
+      </section>
+
       <section className="mb-8">
-        <h2 className="text-xl font-bold mb-2">学習時間ランキング</h2>
-        <ol className="list-decimal pl-5">
-          {sortedRanking.map(([, info], index) => (
-            <li key={index}>{info.name}：{info.time}分</li>
+        <h3 className="text-2xl font-semibold mb-4">🏅 学習時間ランキング</h3>
+        <ol className="list-decimal list-inside space-y-1">
+          {sortedRanking.map(([_, info], idx) => (
+            <li key={idx}>{info.name}：{info.time}分</li>
           ))}
         </ol>
       </section>
 
-      <section className="mb-8">
-        <h2 className="text-xl font-bold">あなたの学習時間</h2>
-        <p>累計：{totalMyTime}分</p>
-        <p>今週：{weeklyTotal}分</p>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="time" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <section className="h-72 mb-8">
+        <ResponsiveContainer>
+          <BarChart data={barData}>
+            <XAxis dataKey="day" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="time" fill="#6366f1" />
+          </BarChart>
+        </ResponsiveContainer>
       </section>
 
       <section>
-        <h2 className="text-xl font-bold mb-2">あなたの学習記録</h2>
+        <h3 className="text-2xl font-semibold mb-4">📖 あなたの学習記録</h3>
         <ul className="list-disc pl-5">
           {userLogs.map((log) => (
             <li key={log.id}>{log.content}（{log.time}分）</li>
           ))}
         </ul>
       </section>
-    </main>
+    </motion.main>
   );
 }
