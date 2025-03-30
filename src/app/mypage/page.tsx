@@ -11,7 +11,8 @@ import {
   orderBy,
   addDoc,
   updateDoc,
-  doc
+  doc,
+  Timestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import Calendar from "react-calendar";
@@ -22,7 +23,10 @@ interface Log {
   id: string;
   content: string;
   time: number;
-  createdAt?: any;
+  createdAt?: Timestamp;
+  subject?: string;
+  userName?: string;
+  userId: string;
 }
 
 interface Task {
@@ -36,11 +40,11 @@ export default function MyPage() {
   const [user, setUser] = useState<User | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [weeklyGoal, setWeeklyGoal] = useState<number>(10);
-  const [editingGoal, setEditingGoal] = useState(false);
   const [newSubject, setNewSubject] = useState("");
   const [newTopic, setNewTopic] = useState("");
   const [calendarData, setCalendarData] = useState<Record<string, number>>({});
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(10);
+  const [editingGoal, setEditingGoal] = useState(false);
 
   const router = useRouter();
 
@@ -64,8 +68,9 @@ export default function MyPage() {
 
       const calendarMap: Record<string, number> = {};
       fetchedLogs.forEach((log) => {
-        const dateStr = log.createdAt?.toDate().toISOString().split("T")[0];
-        if (dateStr) {
+        const date = log.createdAt?.toDate();
+        if (date) {
+          const dateStr = date.toISOString().split("T")[0];
           calendarMap[dateStr] = (calendarMap[dateStr] || 0) + log.time;
         }
       });
@@ -109,6 +114,40 @@ export default function MyPage() {
     router.push("/");
   };
 
+  const today = new Date().toISOString().split("T")[0];
+  const todayTime = logs
+    .filter((log) => {
+      const date = log.createdAt?.toDate();
+      return date && date.toISOString().split("T")[0] === today;
+    })
+    .reduce((sum, log) => sum + (log.time || 0), 0);
+
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  const weeklyTime = logs
+    .filter((log) => {
+      const date = log.createdAt?.toDate();
+      return date && date >= weekAgo;
+    })
+    .reduce((sum, log) => sum + (log.time || 0), 0);
+
+  const totalTime = logs.reduce((sum, log) => sum + (log.time || 0), 0);
+
+  const subjectTimes: Record<string, number> = {};
+  logs.forEach((log) => {
+    if (log.subject) {
+      subjectTimes[log.subject] = (subjectTimes[log.subject] || 0) + log.time;
+    }
+  });
+
+  const rankingMap: Record<string, number> = {};
+  logs.forEach((log) => {
+    rankingMap[log.userId] = (rankingMap[log.userId] || 0) + (log.time || 0);
+  });
+  const sortedRanking = Object.entries(rankingMap).sort((a, b) => b[1] - a[1]);
+  const myRank = sortedRanking.findIndex(([id]) => id === user?.uid) + 1;
+
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -130,6 +169,52 @@ export default function MyPage() {
 
       <h1 className="text-4xl font-bold text-center mb-8">マイページ</h1>
 
+      <section className="mb-6 bg-white p-4 rounded shadow">
+        <h2 className="text-2xl font-bold mb-4">学習状況</h2>
+        <p>累計学習時間：{totalTime}分</p>
+        <p>今週の学習時間：{weeklyTime}分</p>
+        <p>今日の学習時間：{todayTime}分</p>
+        <p>勉強時間ランキング：{myRank}位</p>
+        <div className="flex gap-4 mt-4">
+          {['国語','数学','英語','理科','社会','情報'].map((subj) => (
+            <div key={subj} className="text-center">
+              <p className="font-bold">{subj}</p>
+              <p>{subjectTimes[subj] || 0}分</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-6 bg-white p-4 rounded shadow">
+        <h2 className="text-2xl font-bold mb-4">週間目標</h2>
+        {editingGoal ? (
+          <div>
+            <input
+              type="number"
+              value={weeklyGoal}
+              onChange={(e) => setWeeklyGoal(Number(e.target.value))}
+              className="border p-2 rounded mr-2"
+            />
+            <button
+              onClick={() => setEditingGoal(false)}
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              設定
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p className="text-lg font-semibold">今週の目標：{weeklyGoal}時間</p>
+            <button
+              onClick={() => setEditingGoal(true)}
+              className="px-4 py-2 bg-gray-500 text-white rounded mt-2"
+            >
+              目標を変更
+            </button>
+          </div>
+        )}
+      </section>
+
       <section className="mb-6">
         <h2 className="text-2xl font-bold mb-4">勉強時間カレンダー</h2>
         <div className="bg-white p-4 rounded shadow text-center max-w-xl mx-auto">
@@ -148,24 +233,8 @@ export default function MyPage() {
           />
         </div>
       </section>
-   
-
       <section className="mb-6">
         <h2 className="text-2xl font-bold mb-4">StudyToDoリスト</h2>
-        <div className="bg-white p-4 rounded shadow mb-4">
-          <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)} className="border p-2 rounded mr-2">
-            <option value="">科目を選択</option>
-            <option value="国語">国語</option>
-            <option value="数学">数学</option>
-            <option value="英語">英語</option>
-            <option value="理科">理科</option>
-            <option value="社会">社会</option>
-            <option value="情報">情報</option>
-          </select>
-          <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="単元を入力" className="border p-2 rounded mr-2" />
-          <button onClick={handleAddTask} className="px-4 py-2 bg-green-500 text-white rounded">追加</button>
-        </div>
-
         <ul className="space-y-2">
           {tasks.filter((t) => !t.completed).map((task) => (
             <li key={task.id} className="bg-white p-3 rounded shadow flex justify-between items-center">

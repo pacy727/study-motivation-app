@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Zen_Maru_Gothic } from "next/font/google";
+//import { Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 
 
