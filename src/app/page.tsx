@@ -157,7 +157,7 @@ export default function HomePage() {
       <section className="mb-8">
         <h3 className="text-2xl font-semibold mb-4">🏅 学習時間ランキング</h3>
         <ol className="list-decimal list-inside space-y-1">
-          {sortedRanking.map(([_, info], idx) => (
+          {sortedRanking.map(([, info], idx) => (
             <li key={idx}>{info.name}：{info.time}分</li>
           ))}
         </ol>

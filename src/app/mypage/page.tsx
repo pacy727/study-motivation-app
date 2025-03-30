@@ -169,21 +169,25 @@ export default function MyPage() {
 
       <h1 className="text-4xl font-bold text-center mb-8">マイページ</h1>
 
+
       <section className="mb-6 bg-white p-4 rounded shadow">
         <h2 className="text-2xl font-bold mb-4">学習状況</h2>
         <p>累計学習時間：{totalTime}分</p>
         <p>今週の学習時間：{weeklyTime}分</p>
         <p>今日の学習時間：{todayTime}分</p>
         <p>勉強時間ランキング：{myRank}位</p>
-        <div className="flex gap-4 mt-4">
-          {['国語','数学','英語','理科','社会','情報'].map((subj) => (
-            <div key={subj} className="text-center">
-              <p className="font-bold">{subj}</p>
-              <p>{subjectTimes[subj] || 0}分</p>
-            </div>
-          ))}
-        </div>
+       
       </section>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-center mb-8">
+                {["国", "数", "英", "理", "社", "情"].map((subj) => (
+          <div key={subj} className="bg-white p-4 rounded shadow">
+            <h3 className="font-semibold text-sm">{subj}</h3>
+            <p className="text-lg font-bold">{subjectTimes[subj] || 0}分</p>
+          </div>
+        ))}
+      </div>
+      
+
 
       <section className="mb-6 bg-white p-4 rounded shadow">
         <h2 className="text-2xl font-bold mb-4">週間目標</h2>
@@ -235,6 +239,31 @@ export default function MyPage() {
       </section>
       <section className="mb-6">
         <h2 className="text-2xl font-bold mb-4">StudyToDoリスト</h2>
+        <div className="mb-6 bg-white p-4 rounded shadow">
+        <h2 className="text-2xl font-bold mb-2">新しいToDoを追加</h2>
+        <div className="flex flex-col sm:flex-row gap-2 mb-2">
+          <input
+            type="text"
+            value={newSubject}
+            onChange={(e) => setNewSubject(e.target.value)}
+            placeholder="科目"
+            className="border p-2 rounded w-full sm:w-1/3"
+          />
+          <input
+            type="text"
+            value={newTopic}
+            onChange={(e) => setNewTopic(e.target.value)}
+            placeholder="単元"
+            className="border p-2 rounded w-full sm:w-2/3"
+          />
+        </div>
+        <button
+          onClick={handleAddTask}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          追加
+        </button>
+      </div>
         <ul className="space-y-2">
           {tasks.filter((t) => !t.completed).map((task) => (
             <li key={task.id} className="bg-white p-3 rounded shadow flex justify-between items-center">
