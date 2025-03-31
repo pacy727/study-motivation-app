@@ -43,7 +43,7 @@ export default function StudyStats({ logs }: Props) {
   logs.forEach((log) => {
     rankingMap[log.userId] = (rankingMap[log.userId] || 0) + (log.time || 0);
   });
-  const sortedRanking = Object.entries(rankingMap).sort((a, b) => b[1] - a[1]);
+  // const sortedRanking = Object.entries(rankingMap).sort((a, b) => b[1] - a[1]);
   // 仮に自分のIDが "xxx" としてもいいですが、このコンポーネントは受け取っていない
   // MyPage側でRankを計算するなら propsにmyRankを渡してもOKです
   const myRank = "??";

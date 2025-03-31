@@ -1,8 +1,8 @@
 "use client";
 
-interface RankingInfo {
-  [key: string]: number;
-}
+// interface RankingInfo {
+//   [key: string]: number;
+// }
 
 interface Props {
   // e.g. [[username, {time:number}], ...]

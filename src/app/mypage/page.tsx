@@ -17,7 +17,6 @@ import {
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
 
 import { motion } from "framer-motion";
-import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
 // コンポーネントたち
